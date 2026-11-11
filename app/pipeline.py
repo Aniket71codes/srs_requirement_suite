@@ -32,11 +32,52 @@ MODEL2_LABELS = {
 }
 
 MODEL3_LABELS = {
-    "A": {"name": "Availability", "description": "Uptime, access continuity, downtime, service reachability."},
-    "PE": {"name": "Performance", "description": "Speed, response time, load, scale, throughput."},
-    "SE": {"name": "Security", "description": "Authentication, authorization, encryption, privacy, threats."},
-    "US": {"name": "Usability", "description": "Ease of use, navigation, clarity, learnability, errors."},
+    "A":  {"name": "Availability",    "description": "Uptime, access continuity, downtime, service reachability."},
+    "PE": {"name": "Performance",     "description": "Speed, response time, load, scale, throughput."},
+    "SE": {"name": "Security",        "description": "Authentication, authorization, encryption, privacy, threats."},
+    "US": {"name": "Usability",       "description": "Ease of use, navigation, clarity, learnability, errors."},
+    "MN": {"name": "Maintainability", "description": "Extensibility, modularity, testability, code quality."},
+    "PO": {"name": "Portability",     "description": "Platform independence, cross-device, OS compatibility."},
+    "RL": {"name": "Reliability",     "description": "Accuracy, fault tolerance, correct output, error rate."},
+    "SC": {"name": "Scalability",     "description": "Concurrent users, horizontal scaling, capacity growth."},
 }
+
+# Model 1 confidence below this threshold → flagged as Needs Review
+NEEDS_REVIEW_THRESHOLD = 0.65
+
+# Keyword lists for NFR categories that Model 3 does not cover.
+# Used to override low-confidence US/PE classifications from Model 3.
+_EXTENDED_KEYWORDS: dict[str, list[str]] = {
+    "MN": ["extend", "extensib", "maintainab", "test environment", "testab", "modular", "new function", "refactor", "easy to change", "easy to modify"],
+    "PO": ["ios", "android", "portable", "portab", "cross-platform", "platform independent", "mobile platform"],
+    "RL": ["reliab", "correct result", "accuracy", "accurate", "fault toleran", "right result", "error rate", "failure rate"],
+    "SC": ["concurrent user", "scalab", "peak load", "high traffic", "growing number"],
+}
+
+_BULLET_RE = re.compile(r"^(?:\d+[\.\)]\s+|\(?[a-zA-Z]\)\s+|[-•*–·]\s+)")
+_REQ_SIGNAL_RE = re.compile(r"\b(shall|must|should|will|is required to|be able to)\b", re.I)
+
+
+def _apply_extended_nfr(text: str, code: str, confidence: float) -> tuple[str, float]:
+    """Post-process Model 3 output to cover NFR categories beyond A/PE/SE/US.
+
+    Override rules:
+    - confidence < 0.75:  any 1+ keyword hit overrides (Model 3 uncertain)
+    - 0.75 <= conf < 0.85: requires 2+ keyword hits (strong domain evidence)
+    - confidence >= 0.85: trust Model 3, no override
+    """
+    if confidence >= 0.85:
+        return code, confidence
+    t = text.lower()
+    best_code, best_hits = code, 0
+    for ext_code, keywords in _EXTENDED_KEYWORDS.items():
+        hits = sum(1 for kw in keywords if kw in t)
+        min_hits = 2 if confidence >= 0.75 else 1
+        if hits >= min_hits and hits > best_hits:
+            best_hits, best_code = hits, ext_code
+    if best_hits >= 1 and best_code != code:
+        return best_code, round(0.70 + min(best_hits * 0.06, 0.18), 4)
+    return code, confidence
 
 
 def _softmax(logits: np.ndarray) -> np.ndarray:
@@ -50,7 +91,14 @@ def split_candidate_sentences(text: str) -> list[str]:
     text = re.sub(r"[ \t]+", " ", text)
     chunks: list[str] = []
     for line in text.splitlines():
-        line = line.strip(" -\t")
+        line = line.strip()
+        if not line:
+            continue
+        # Skip likely section headers: short lines with no requirement signal words
+        if len(line.split()) <= 6 and not _REQ_SIGNAL_RE.search(line):
+            continue
+        # Strip bullet and numbered-list prefixes before splitting
+        line = _BULLET_RE.sub("", line).strip()
         if not line:
             continue
         parts = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9(])", line)
@@ -344,17 +392,19 @@ class RequirementPipeline:
             req = self.model1.predict_one(sentence)
             if int(req.label) != 1:
                 continue
+            needs_review = req.confidence < NEEDS_REVIEW_THRESHOLD
             frnfr = self.model2.predict_one(sentence)
             frnfr_info = MODEL2_LABELS[int(frnfr.label)]
             nfr_type = None
             if int(frnfr.label) == 1:
                 pred3 = self.model3.predict_one(sentence)
-                label = normalize_model3_label(pred3.label)
+                raw_label = normalize_model3_label(pred3.label)
+                final_label, final_conf = _apply_extended_nfr(sentence, raw_label, pred3.confidence)
                 nfr_type = {
-                    "code": label,
-                    "name": MODEL3_LABELS.get(label, {}).get("name", label),
-                    "description": MODEL3_LABELS.get(label, {}).get("description", ""),
-                    "confidence": round(pred3.confidence, 4),
+                    "code": final_label,
+                    "name": MODEL3_LABELS.get(final_label, {}).get("name", final_label),
+                    "description": MODEL3_LABELS.get(final_label, {}).get("description", ""),
+                    "confidence": round(final_conf, 4),
                     "probabilities": pred3.probabilities,
                 }
             rows.append(
@@ -362,6 +412,7 @@ class RequirementPipeline:
                     "id": idx,
                     "text": sentence,
                     "requirementConfidence": round(req.confidence, 4),
+                    "needsReview": needs_review,
                     "class": frnfr_info,
                     "classConfidence": round(frnfr.confidence, 4),
                     "classProbabilities": frnfr.probabilities,
@@ -373,6 +424,7 @@ class RequirementPipeline:
             "requirements": len(rows),
             "functional": sum(1 for row in rows if row["class"]["code"] == "FR"),
             "nonFunctional": sum(1 for row in rows if row["class"]["code"] == "NFR"),
+            "needsReview": sum(1 for row in rows if row["needsReview"]),
         }
         type_counts: dict[str, int] = {}
         for row in rows:

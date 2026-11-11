@@ -3,52 +3,86 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SRS Requirement Intelligence Suite</title>
+    <title>DocuMind — SRS Intelligence Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
+
+    <!-- TOP NAV -->
+    <nav class="topnav">
+      <div class="topnav-inner">
+        <a class="brand" href="#">
+          <span class="brand-mark">◈</span>
+          <span class="brand-name">DocuMind</span>
+        </a>
+        <div class="model-status-bar">
+          <div class="model-pill">
+            <span class="pill-led"></span>
+            <span class="pill-label">Model 1</span>
+            <span class="pill-value" id="model1Status">…</span>
+          </div>
+          <div class="model-pill">
+            <span class="pill-led"></span>
+            <span class="pill-label">Model 2</span>
+            <span class="pill-value" id="model2Status">…</span>
+          </div>
+          <div class="model-pill">
+            <span class="pill-led"></span>
+            <span class="pill-label">Model 3</span>
+            <span class="pill-value" id="model3Status">…</span>
+          </div>
+        </div>
+      </div>
+    </nav>
+
     <main class="shell">
+
+      <!-- HERO BANNER -->
       <section class="hero">
-        <div>
-          <p class="eyebrow">Three-stage SRS intelligence pipeline</p>
-          <h1>SRS Requirement Intelligence Suite</h1>
+        <div class="hero-text">
+          <p class="eyebrow">Three-stage ML pipeline</p>
+          <h1>SRS Requirement Intelligence</h1>
           <p class="intro">
-            Extract requirement statements, separate functional from non-functional requirements,
-            and identify NFR categories with a clean audit trail.
+            Extract requirement statements from any SRS document, classify functional
+            versus non-functional, and identify NFR subtypes with a clean audit trail.
           </p>
         </div>
-        <div class="status-panel" id="statusPanel">
-          <div class="status-row">
-            <span>Model 1</span>
-            <strong id="model1Status">Checking</strong>
+        <div class="hero-pipeline">
+          <div class="pipeline-step">
+            <span class="ps-num">01</span>
+            <span class="ps-label">Requirement<br>Detection</span>
           </div>
-          <div class="status-row">
-            <span>Model 2</span>
-            <strong id="model2Status">Checking</strong>
+          <span class="ps-arrow">→</span>
+          <div class="pipeline-step">
+            <span class="ps-num">02</span>
+            <span class="ps-label">FR / NFR<br>Classifier</span>
           </div>
-          <div class="status-row">
-            <span>Model 3</span>
-            <strong id="model3Status">Checking</strong>
+          <span class="ps-arrow">→</span>
+          <div class="pipeline-step">
+            <span class="ps-num">03</span>
+            <span class="ps-label">NFR<br>Subtype</span>
           </div>
         </div>
       </section>
 
+      <!-- WORKSPACE -->
       <section class="workspace">
-        <form class="input-panel" id="analyzeForm">
+        <form class="input-panel card" id="analyzeForm">
           <div class="panel-head">
             <div>
               <p class="section-kicker">Input</p>
               <h2>Analyze an SRS document</h2>
             </div>
-            <button class="primary-button" type="submit">
-              <span class="button-icon">↗</span>
-              Analyze
+            <button class="btn btn-primary" type="submit">
+              <span class="btn-icon">↗</span> Analyze
             </button>
           </div>
 
           <label class="upload-box" for="fileInput">
             <input id="fileInput" name="file" type="file" accept=".txt,.pdf,.docx" />
-            <span class="upload-icon">+</span>
+            <span class="upload-icon">↑</span>
             <span>
               <strong>Upload TXT, PDF, or DOCX</strong>
               <small id="fileName">No file selected</small>
@@ -61,61 +95,100 @@
             id="srsText"
             name="text"
             spellcheck="true"
-            placeholder="Paste the SRS content here. Example: The system shall allow users to reset passwords. The application must respond within 2 seconds."
+            placeholder="Paste the SRS content here. Example: The system shall allow users to reset their password. Response time must not exceed 2 seconds under normal load."
           ></textarea>
         </form>
 
-        <aside class="insight-panel">
+        <aside class="insight-panel card">
           <p class="section-kicker">Live Summary</p>
           <div class="metric-grid">
             <div class="metric">
-              <span>Candidates</span>
-              <strong id="metricCandidates">0</strong>
+              <span class="metric-label">Candidates</span>
+              <strong class="metric-value" id="metricCandidates">0</strong>
             </div>
             <div class="metric">
-              <span>Requirements</span>
-              <strong id="metricRequirements">0</strong>
+              <span class="metric-label">Requirements</span>
+              <strong class="metric-value" id="metricRequirements">0</strong>
             </div>
-            <div class="metric">
-              <span>Functional</span>
-              <strong id="metricFunctional">0</strong>
+            <div class="metric metric-fr">
+              <span class="metric-label">Functional</span>
+              <strong class="metric-value" id="metricFunctional">0</strong>
             </div>
-            <div class="metric">
-              <span>NFR</span>
-              <strong id="metricNfr">0</strong>
+            <div class="metric metric-nfr">
+              <span class="metric-label">Non-Functional</span>
+              <strong class="metric-value" id="metricNfr">0</strong>
+            </div>
+            <div class="metric metric-review" id="metricNeedsReview" style="display:none">
+              <span class="metric-label">Needs Review</span>
+              <strong class="metric-value" id="metricNeedsReviewCount">0</strong>
             </div>
           </div>
           <div class="type-stack" id="typeStack">
-            <div class="empty-state">NFR category distribution appears after analysis.</div>
+            <div class="empty-state">NFR distribution appears after analysis.</div>
           </div>
         </aside>
       </section>
 
-      <section class="results-panel">
+      <!-- CHARTS SECTION -->
+      <section class="charts-section" id="chartsSection" style="display:none">
+        <div class="charts-head">
+          <p class="section-kicker">Analytics</p>
+          <h2>Requirement overview</h2>
+        </div>
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <span class="chart-title">FR / NFR Split</span>
+              <span class="chart-subtitle" id="chartDonutSubtitle">—</span>
+            </div>
+            <div class="chart-wrap chart-wrap-donut">
+              <canvas id="chartDonut"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <span class="chart-title">NFR Categories</span>
+              <span class="chart-subtitle" id="chartBarSubtitle">—</span>
+            </div>
+            <div class="chart-wrap chart-wrap-bar">
+              <canvas id="chartBar"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <span class="chart-title">Confidence Distribution</span>
+              <span class="chart-subtitle">Model confidence buckets across all requirements</span>
+            </div>
+            <div class="chart-wrap chart-wrap-conf">
+              <canvas id="chartConf"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RESULTS -->
+      <section class="results-panel card">
         <div class="panel-head results-head">
           <div>
             <p class="section-kicker">Results</p>
             <h2>Requirement register</h2>
           </div>
-          <div class="toolbar">
-            <select id="filterSelect" aria-label="Filter results">
-              <option value="all">All requirements</option>
-              <option value="FR">Functional only</option>
-              <option value="NFR">Non-functional only</option>
-              <option value="Availability">Availability</option>
-              <option value="Performance">Performance</option>
-              <option value="Security">Security</option>
-              <option value="Usability">Usability</option>
-            </select>
-            <button class="secondary-button" id="exportButton" type="button">Export CSV</button>
-          </div>
+          <button class="btn btn-secondary" id="exportButton" type="button">Export CSV</button>
+        </div>
+        <div class="tab-bar" id="tabBar">
+          <button class="tab active" data-filter="all">All <span class="tab-count" id="tabCountAll">0</span></button>
+          <button class="tab" data-filter="FR">Functional <span class="tab-count" id="tabCountFR">0</span></button>
+          <button class="tab" data-filter="NFR">Non-Functional <span class="tab-count" id="tabCountNFR">0</span></button>
+          <button class="tab tab-review" data-filter="needs-review" id="tabNeedsReview" style="display:none">
+            Needs Review <span class="tab-count" id="tabCountReview">0</span>
+          </button>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Requirement</th>
-                <th>FR/NFR</th>
+                <th>Class</th>
                 <th>NFR Type</th>
                 <th>Confidence</th>
               </tr>
@@ -128,9 +201,11 @@
           </table>
         </div>
       </section>
+
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <script src="/static/app.js"></script>
   </body>
 </html>
